@@ -1,0 +1,2 @@
+# stknew
+with fund manager
