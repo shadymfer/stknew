@@ -312,7 +312,7 @@ const BulkTransfer: NextPage = () => {
             <a
               href="https://magiceden.io/marketplace/tshc"
             >
-              <h1 className='text-sm text-yellow-500 font-bold mb-8'>Access our UTILITIES! 👻<br /> Click here to get a Shady NFT in Magiceden!</h1>
+              <h1 className='text-sm text-amber-300 font-bold mb-8'>Access our UTILITIES! 👻<br /> Click here to get a Shady NFT in Magiceden!</h1>
             </a>}
 
           <p className='m-2 mt-6 text-center text-xs tracking-wider'>

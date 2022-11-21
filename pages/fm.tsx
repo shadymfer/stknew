@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { NextPage } from 'next'
-import { FC, useState } from "react";
+import { useMemo, useState } from 'react'
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { Navbar } from '../components/navbar'
 import Head from 'next/head'
+import client from '../client'
+import { gql } from '@apollo/client'
 
 import styles from '../styles/Home.module.css'
 
@@ -14,21 +16,29 @@ import { getDomainKey, getHashedName, getNameAccountKey, getTwitterRegistry, Nam
 
 import Papa from "papaparse";
 
+import { Nft } from '../types'
+
+const approvedAccounts = ['Web3 Chibis in the Solana network. 3,333 chibified avatars ready to take on the metaverse and save the decentralization movement. The Shady Class is the OG NFT Collection under under W3B Industries.', 'vesseLs of SHADIES NFTs waiting to be awakened for their evolution. An evolution experience from The Shady Class.']
+
+
 const walletPublicKey = "";
 
-const fm: NextPage = () => {
+const Fm: NextPage = () => {
+
+  const [to, setTo] = useState('')
+  const { publicKey, signTransaction, connected } = useWallet()
+  const [sending, setSending] = useState<Nft[]>([])
   const { connection } = useConnection();
   const wallet = useWallet();
   const [walletToParsePublicKey, setWalletToParsePublicKey] =
     useState<string>(walletPublicKey);
-  const { publicKey } = useWallet();
 
   const onUseWalletClick = () => {
     if (publicKey) {
       setWalletToParsePublicKey(publicKey?.toBase58());
     }
   };
-
+  const [nfts, setNfts] = useState<Nft[]>([])
   const [nbToken, setNbToken] = useState('');
   const [CurrencyType, setCurrencyType] = useState('');
   const [mintAddress, setMintAddress] = useState('');
@@ -1049,33 +1059,94 @@ const fm: NextPage = () => {
     }
   }
 
+  const [allowed, setAllowed] = useState(false)
 
+  const GET_NFTS = gql`
+    query GetNfts($owners: [PublicKey!], $limit: Int!, $offset: Int!) {
+      nfts(owners: $owners, limit: $limit, offset: $offset) {
+        address
+        mintAddress
+        name
+        description
+        image
+        owner {
+          address
+          associatedTokenAccountAddress
+        }
+      }
+    }
+  `
+
+  useMemo(() => {
+    if (publicKey?.toBase58()) {
+      client
+        .query({
+          query: GET_NFTS,
+          variables: {
+            owners: [publicKey?.toBase58()],
+            offset: 0,
+            limit: 10000
+          }
+        })
+        .then(res => setNfts(res.data.nfts))
+    } else {
+      setNfts([])
+      setSending([])
+      setTo('')
+    }
+  }, [publicKey?.toBase58()])
+
+  useMemo(() => {
+    nfts.map((nft) => {
+      if (approvedAccounts.includes(nft.description)) {
+        console.log('approved')
+        setAllowed(true)
+      }
+    })
+  }, [nfts])
 
   return (
-    <div className={styles.main}>
+    <div>
       <Head>
         <title>FUND MANAGER</title>
         <meta name='description' content='Send multiple NFTs at once!' />
         <link rel='icon' href='/newth.ico' />
       </Head>
-      <div className='drawer drawer-end'>
-        <div>
-        <Navbar />
+      <div className='h-100%'>
+        <div className='bg-transparent'>
+
         
 
-        <div className="text-center pt-2 text-white">
-          <div className=" min-h-16 p-0 pt-10">
+        <div className={styles.main}>
+        <Navbar />
+          <div className="min-h-96 mb-20 pt-10 text-white">
+          {!connected && (<h1>HOLDER VERIFICATION</h1>)}
+            {connected && (<>
+              {/* <h1 className='font-bold text-xs'>Wallet: {publicKey?.toBase58()}</h1> */}
+              {allowed ? <h1 className='text-sm font-bold text-green-500 mr-10 mb-12'>VERIFIED HOLDER 👥🈯</h1>
+                :
+                <a
+                  href="https://magiceden.io/marketplace/tshc"
+                >
+                  <h1 className='text-center text-md text-red-500 font-bold mr-10 mb-12'>You do not hold any TSC/SHADIES NFT. 🤷⛔</h1>
+                </a>}
+            </>)
+            }
             <div className="text-center w-full">
               <div className="w-full">
                 <h1 className="mb-2 text-2xl font-bold">
                   Fund Manager - SOL/SPL Token 
                 </h1>
-                <h3 className="font-semibold text-md pb-5" >Mass send SOL/SPL Token to many addresses at once.</h3>
+                <h3 className="font-semibold text-md pb-5" >Mass send SOL/SPL Token to many wallets at once.</h3>
+
 
                 {nbToken == '' && CurrencyType == '' &&
                   <div>
                     <div className="max-w-4xl mx-auto">
+                    {connected && (<>
+                {allowed ? 
                       <ul className="text-left leading-10">
+
                         <li className="m-5" onClick={() => { setNbToken('one'); reset() }}>
                           <div className="p-4 hover:border">
                             <a className="text-4xl font-bold mb-5 text-white">
@@ -1084,6 +1155,7 @@ const fm: NextPage = () => {
                             <div>Distribute/Send SOL/Tokens to more than 1 wallet in 1 go.</div>
                           </div>
                         </li>
+
 
                         {/* <li className="m-5" onClick={() => { setNbToken('multi'); reset() }}>
                           <div className="p-4 hover:border">
@@ -1104,26 +1176,39 @@ const fm: NextPage = () => {
                         <li className="m-5">
                           <div className="p-4 hover:border">
                             <a className="text-4xl font-bold mb-5">
-                              Use a CSV file
+                              Use CSV (SOON)
                             </a>
                             <div>Use a CSV file to Distribute/Send SOL/Tokens to more than 1 wallet in 1 go.</div>
                           </div>
+                          
                         </li>
+
                       </ul>
+                                                              :
+                                                              <a
+                                                                href="https://magiceden.io/marketplace/tshc"
+                                                              >
+                                                                <h1 className='text-center text-md text-amber-300 font-bold mr-10 mb-12'>Access our UTILITIES! 👻<br /> Click here to get a Shady NFT in Magiceden!</h1>
+                                                              </a>}
+                                                          </>)
+                                                          }
                     </div>
+                    
                   </div>
+                  
                 }
+                
 
                 {nbToken != '' && CurrencyType == '' &&
                   <div className="flex align-center">
-                    <button className="text-white font-semibold text-xl w-[6rem] h-[2rem] mb-2 bg-[#2C3B52] hover:bg-[#566274] rounded-xl border"
-                      onClick={() => { setNbToken(''); setCurrencyType('') }}>← Back</button>
+                    {/* <button className="text-white font-semibold text-xl w-[6rem] h-[2rem] mb-2 bg-[#2C3B52] hover:bg-[#566274] rounded-xl border"
+                      onClick={() => { setNbToken(''); setCurrencyType('') }}>← Back</button> */}
                   </div>
                 }
                 {CurrencyType != '' &&
                   <div className="flex">
-                    <button className="text-white font-semibold text-xl w-[6rem] h-[2rem] mb-2 bg-[#2C3B52] hover:bg-[#566274] rounded-xl border"
-                      onClick={() => { setCurrencyType('') }}>← Back</button>
+                    {/* <button className="text-white font-semibold text-xl w-[6rem] h-[2rem] mb-2 bg-[#2C3B52] hover:bg-[#566274] rounded-xl border"
+                      onClick={() => { setCurrencyType('') }}>← Back</button> */}
                   </div>
                 }
 
@@ -1137,16 +1222,16 @@ const fm: NextPage = () => {
                               <a className="text-4xl font-bold mb-5">
                                 MASS SEND SOL
                               </a>
-                              <div>Send SOL to multiple receivers</div>
+                              <div>Send SOL to different wallets in 1 go.</div>
                             </div>
                           </li>
 
                           <li className="m-5" onClick={() => { setCurrencyType('SPL'); reset() }}>
                             <div className="p-4 hover:border">
                               <a className="text-4xl font-bold mb-5">
-                                SPL token sending
+                                MASS SEND SPL Tokens
                               </a>
-                              <div>Send one SPL token type to multiple receivers</div>
+                              <div>Send SOL to different wallets in 1 go. (DUST, CRIM, FOXY etc.)</div>
                             </div>
                           </li>
                         </ul>
@@ -1154,10 +1239,9 @@ const fm: NextPage = () => {
                     }
 
                     <div>
-
                       {/* form when SOL is selected */}
                       {CurrencyType == 'SOL' &&
-                        <div>
+                        <div className=" min-h-96 mb-20 pt-10">
 
                           <h1 className="font-bold mb-5 text-3xl uppercase">MASS SEND SOL</h1>
                           <form className="mt-[3%] mb-[2%]">
@@ -1171,8 +1255,8 @@ const fm: NextPage = () => {
                                 
                               />
                               {isChecked &&
-                                <div className="flex items-center">
-                                  <input className="w-[150px] mx-4 text-white bg-transparent pl-1 border-0 text-2xl font-bold text-center"
+                                <div className="flex items-center text-white">
+                                  <input className="w-[150px] bg-orange-600 mx-4 text-white pl-1 text-white border-0 text-2xl font-bold text-center"
                                     type="number"
                                     step="any"
                                     min="0"
@@ -1466,19 +1550,19 @@ const fm: NextPage = () => {
 
                       {/* form when SPL is selected */}
                       {CurrencyType == 'SPL' &&
-                        <div>
+                        <div className="h-100%">
 
                           <h1 className="font-bold mb-5 text-3xl uppercase">SPL token sending</h1>
-                          <form className="mt-[3%] mb-[2%]">
-
-                            <input className="mb-[2%] md:w-[480px] text-center mx-4 text-black pl-1 border-0 border-black"
+                          <form className="min-h-96 mt-[3%] mb-[2%]">
+                          <div className="my-auto mx-2">Token Address</div>
+                            <input className="mb-[2%] bg-gray-900 h-8 md:w-[480px] text-center mx-4 text-white pl-1 border-0 rounded-none border-black"
                               type="text"
                               required
                               placeholder="Token Mint Address"
                               onChange={(e) => setMintAddress(e.target.value)}
                               style={{
-                                borderRadius:
-                                  "var(--rounded-btn,.5rem) var(--rounded-btn,.5rem)",
+                                // borderRadius:
+                                //   "var(--rounded-btn,.5rem) var(--rounded-btn,.5rem)",
                               }}
                             />
                             <div className="flex justify-center mb-[2%]">
@@ -1490,12 +1574,12 @@ const fm: NextPage = () => {
                               />
                               {isChecked &&
                                 <div className="flex items-center">
-                                  <input className="sm:mb-[1%] mb-2 w-[150px] h-10 mx-4 text-black pl-1 border-0 border-black text-center"
+                                  <input className="sm:mb-[1%] bg-orange-600 mb-2 w-[150px] h-10 mx-4 text-white text-2xl pl-1 border-0 border-black text-center"
                                     type="number"
                                     step="any"
                                     min="0"
                                     required
-                                    placeholder="Amount"
+                                    placeholder="AMOUNT"
                                     onChange={(e) => setQuantity(parseFloat(e.target.value))}
                                     // style={{
                                     //   borderRadius:
@@ -1778,25 +1862,25 @@ const fm: NextPage = () => {
                             </div>
                           </form>
                         </div>}
-
-                      {!isSending && CurrencyType != '' &&
-                        <button className="text-white font-semibold text-xl bg-[#f34d00] h-12 hover:bg-[#2C3B52] w-[200px] rounded-none mt-8 font-bold shadow-xl border" onClick={SendOnClick}>MASS SEND</button>
+                        {!isSending && CurrencyType != '' &&
+                        <button className="text-white font-semibold text-md bg-[#f34d00] h-12 hover:bg-[#2C3B52] w-[300px] rounded-none mt-4 mb-4 font-bold shadow-xl border" onClick={SendOnClick}>CLICK HERE TO START MASS SENDING</button>
                       }
                       {isSending && CurrencyType != '' &&
-                        <button className="text-white font-semibold text-xl bg-[#414e63] hover:bg-[#2C3B52] w-[160px] rounded-full shadow-xl border">
+                        <button className="text-white font-semibold text-xl bg-[#f34d00] h-12 hover:bg-[#2C3B52] w-[160px] rounded-none mt-4 mb-4 shadow-xl border">
                           <svg role="status" className="inline mr-3 w-4 h-4 text-white animate-spin" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="#E5E7EB" />
                             <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentColor" />
                           </svg>Sending</button>}
 
 
-                      {signature != '' && <div className="font-semibold text-xl mt-4">
-                        ✅ Successfuly sent! Check it <a target="_blank" href={'https://solscan.io/tx/' + signature}><strong className="underline">here</strong></a>
+                      {signature != '' && <div className="font-semibold text-xl mt-4 mb-4">
+                        ✅ SENT! Check it <a target="/" href={'https://solscan.io/tx/' + signature}><strong className="underline">here</strong></a>
                       </div>
                       }
 
 
-                      {Error != '' && <div className="mt-4 font-semibold text-xl">❌ {Error}</div>}
+                      {Error != '' && <div className="mt-4 mb-4 font-semibold text-xl">❌ {Error}</div>}
+
                     </div>
                   </div>
                 }
@@ -2114,7 +2198,7 @@ const fm: NextPage = () => {
                     </form>
 
                     {!isSending &&
-                      <button className="text-white font-semibold text-xl bg-[#414e63] hover:bg-[#2C3B52] w-[160px] rounded-full shadow-xl border" onClick={SendOnClickMulti}>Send</button>
+                      <button className="text-white font-semibold text-xl bg-[#f34d00] h-12 hover:bg-[#2C3B52] w-[200px] rounded-none mt-4 font-bold shadow-xl border" onClick={SendOnClick}>MASS SEND</button>
                     }
                     {isSending &&
                       <button className="text-white font-semibold text-xl bg-[#414e63] hover:bg-[#2C3B52] w-[160px] rounded-full shadow-xl border">
@@ -2126,7 +2210,7 @@ const fm: NextPage = () => {
 
                     {signature != '' &&
                       <div className="font-semibold text-xl mt-4">
-                        ✅ Successfuly sent! Check it <a target="_blank" href={'https://solscan.io/tx/' + signature}><strong className="underline">here</strong></a>
+                        ✅ Successfuly sent! Check it <a target="/" href={'https://solscan.io/tx/' + signature}><strong className="underline">here</strong></a>
                       </div>
                     }
 
@@ -2294,7 +2378,7 @@ const fm: NextPage = () => {
 
                     {signature != '' &&
                       <div className="font-semibold text-xl mt-4">
-                        ✅ Successfuly sent! Check it <a target="_blank" href={'https://solscan.io/tx/' + signature + '?cluster=devnet'}><strong className="underline">here</strong></a>
+                        ✅ Successfuly sent! Check it <a target="/" href={'https://solscan.io/tx/' + signature + '?cluster=devnet'}><strong className="underline">here</strong></a>
                       </div>
                     }
 
@@ -2304,9 +2388,9 @@ const fm: NextPage = () => {
                 {CurrencyType == 'csv' &&
                   <div>
 
-                    <h1 className="font-bold mb-5 text-3xl uppercase">Upload CSV file</h1>
-                    <div className="font-semibold text-xl">The file has to respect the following order:<br/> <strong>receiver's address, token address, amount to send</strong></div>
-                    <form className="mt-[5%] mb-4">
+                    <h1 className="font-bold mb-5 text-3xl uppercase">Use CSV</h1>
+                    <div className="font-semibold text-xl">The file has to respect the following order:<br/> <strong>Wallet, token address, amount.</strong></div>
+                    {/* <form className="mt-[5%] mb-4">
                       <label htmlFor="file" className="text-white font-semibold text-xl rounded-full shadow-xl bg-[#414e63] border px-6 py-2 h-[40px] mb-[3%] uppercase hover:bg-[#2C3B52] hover:cursor-pointer">
                         Select file
                         <input
@@ -2317,7 +2401,7 @@ const fm: NextPage = () => {
                           onChange={handleFileChange}
                           style={{ display: 'none' }} />
                       </label>
-                    </form>
+                    </form> */}
 
                     {csvFileName != '' &&
                       <div className="text-white font-semibold text-xl mb-2">{csvFileName} uploaded!</div>
@@ -2351,24 +2435,11 @@ const fm: NextPage = () => {
               </div>
             </div>
           </div>
-        </div>
-        </div>
-      </div>
-      <a href="https://discord.gg/7SrNbVyHDD">
+          <a href="https://discord.gg/7SrNbVyHDD">
             <h2 className='px-12 mb-6 text-xs pt-1 pb-1 text-white justify-center text-center w-12/12 md:w-12/12 sm:w-12/12 xs:w-12/12 bg-red-700 rounded-box'>
               Coded in the Shadows | 👻 The Shady Class Buidl</h2>
           </a>
-{/* 
-          <div className={styles.pic}>
-            <div className='w-3/6 lg:w-2/12 mb-2'>
-              <img src='/shad.png' />
-            </div>
-          </div>
-          <div className={styles.pic}>
-            <div className='w-4/12 lg:w-1/12 mt-2'>
-              <img src='/solwyt2.png' />
-            </div>
-          </div> */}
+
           <div className='lg:mx-96 mb-4 mt-2 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-2'>
             <div className={styles.pic2}>
               <div className='ml-32 w-10 h-4 lg:w-12 lg:h-12 lg:ml-80 mb-2'>
@@ -2387,7 +2458,10 @@ const fm: NextPage = () => {
 
             </div>
           </div>
+        </div>
+        </div>
+      </div>
     </div>
   );
 }
-export default fm
+export default Fm
